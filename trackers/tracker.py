@@ -31,7 +31,7 @@ class Tracker:
         batch_size = 20
         detections = []
         for i in range(0, len(frames), batch_size):
-            detection_batch = self.model.predict(frames[i:i + batch_size], conf=0.1)
+            detection_batch = self.model.predict(frames[i : i + batch_size], conf=0.1)
             detections.extend(detection_batch)
         return detections
 
@@ -68,7 +68,9 @@ class Tracker:
                 if cls_names[class_id] == "goalkeeper":
                     detection_supervision.class_id[object_id] = cls_names_inv["player"]
 
-            detection_with_tracks = self.tracker.update_with_detections(detection_supervision)
+            detection_with_tracks = self.tracker.update_with_detections(
+                detection_supervision
+            )
 
             # Update tracks for players and referees
             for frame_detection in detection_with_tracks:
@@ -196,7 +198,8 @@ class Tracker:
             ball_dict = tracks["ball"][frame_num]
 
             for track_id, player in player_dict.items():
-                frame = self.draw_ellipse(frame, player["bbox"], (0, 0, 255), track_id)
+                color = player.get("team_color", (0, 0, 255))
+                frame = self.draw_ellipse(frame, player["bbox"], color, track_id)
 
             for _, referee in referee_dict.items():
                 frame = self.draw_ellipse(frame, referee["bbox"], (0, 255, 255))
