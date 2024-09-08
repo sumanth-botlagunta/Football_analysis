@@ -5,6 +5,8 @@ import os
 from utils import get_bbox_center, get_bbox_width
 import cv2
 import numpy as np
+import pandas as pd
+from typing import List, Dict, Any
 
 
 class Tracker:
@@ -17,6 +19,24 @@ class Tracker:
         """
         self.model = YOLO(model_path)
         self.tracker = sv.ByteTrack()
+
+    def interpolate_ball_positions(self, ball_positions: List[Dict[int, Dict[str, Any]]]) -> List[Dict[int, Dict[str, List[float]]]]:
+        """
+        Interpolates missing ball positions in the given list of ball positions.
+
+        Args:
+            ball_positions (List[Dict[int, Dict[str, Any]]]): A list of dictionaries containing ball positions with bounding boxes.
+
+        Returns:
+            List[Dict[int, Dict[str, List[float]]]]: A list of dictionaries with interpolated ball positions.
+        """
+        ball_positions = [x.get(1, {}).get('bbox', []) for x in ball_positions]
+        df_ball_positions = pd.DataFrame(ball_positions, columns=['x1', 'y1', 'x2', 'y2'])
+        df_ball_positions = df_ball_positions.interpolate()
+        df_ball_positions = df_ball_positions.bfill()
+        ball_positions = [{1: {'bbox': bbox}} for bbox in df_ball_positions.to_numpy().tolist()]
+
+        return ball_positions
 
     def detect_frames(self, frames):
         """
