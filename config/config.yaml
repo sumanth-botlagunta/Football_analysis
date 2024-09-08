@@ -1,0 +1,4 @@
+input_video_path: "/Users/sumanth/Developer/Football_analysis/input.mp4"
+output_video_path: "/Users/sumanth/Developer/Football_analysis/out/output.avi"
+model_path: "/Users/sumanth/Developer/Football_analysis/models/football-yolov8x.pt"
+tracks_stub_path: "/Users/sumanth/Developer/Football_analysis/stubs/track-stub.pkl"
