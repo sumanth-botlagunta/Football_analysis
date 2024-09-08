@@ -4,6 +4,7 @@ from team_assigner import TeamAssigner
 from player_ball_assigner import PlayerBallAssigner
 
 import yaml
+import numpy as np
 
 # Load configuration from config file
 with open("config/config.yaml", "r") as file:
@@ -38,13 +39,18 @@ def main():
                 team_assigner.team_colors[team]
             )
     player_ball_assigner = PlayerBallAssigner()
+    team_ball_control = []
     for frame_num, player_track in enumerate(tracks['players']):
         ball_bbox = tracks['ball'][frame_num][1]['bbox']
         assigned_player = player_ball_assigner.assign_ball_to_player(player_track, ball_bbox)
         if assigned_player != -1:
             tracks['players'][frame_num][assigned_player]['has_ball'] = True
+            team_ball_control.append(tracks['players'][frame_num][assigned_player]['team'])
+        else:
+            team_ball_control.append(team_ball_control[-1])
+    team_ball_control = np.array(team_ball_control)
 
-    output_video_frames = tracker.draw_annotations(video_frames, tracks)
+    output_video_frames = tracker.draw_annotations(video_frames, tracks, team_ball_control)
 
     save_video(output_video_frames, OUTPUT_VIDEO_PATH)
 

@@ -6,11 +6,11 @@ from utils import get_bbox_center, get_bbox_width
 import cv2
 import numpy as np
 import pandas as pd
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 
 class Tracker:
-    def __init__(self, model_path) -> None:
+    def __init__(self, model_path: str) -> None:
         """
         Initializes the Tracker with a YOLO model and ByteTrack tracker.
 
@@ -32,40 +32,39 @@ class Tracker:
         """
         ball_positions = [x.get(1, {}).get('bbox', []) for x in ball_positions]
         df_ball_positions = pd.DataFrame(ball_positions, columns=['x1', 'y1', 'x2', 'y2'])
-        df_ball_positions = df_ball_positions.interpolate()
-        df_ball_positions = df_ball_positions.bfill()
+        df_ball_positions = df_ball_positions.interpolate().bfill()
         ball_positions = [{1: {'bbox': bbox}} for bbox in df_ball_positions.to_numpy().tolist()]
 
         return ball_positions
 
-    def detect_frames(self, frames):
+    def detect_frames(self, frames: List[np.ndarray]) -> List[Any]:
         """
         Detects objects in the given frames using the YOLO model.
 
         Args:
-            frames (list): List of frames to detect objects in.
+            frames (List[np.ndarray]): List of frames to detect objects in.
 
         Returns:
-            list: List of detections for each frame.
+            List[Any]: List of detections for each frame.
         """
         batch_size = 20
         detections = []
         for i in range(0, len(frames), batch_size):
-            detection_batch = self.model.predict(frames[i : i + batch_size], conf=0.1)
+            detection_batch = self.model.predict(frames[i: i + batch_size], conf=0.1)
             detections.extend(detection_batch)
         return detections
 
-    def get_object_tracks(self, frames, read_from_stub=False, stub_path=None):
+    def get_object_tracks(self, frames: List[np.ndarray], read_from_stub: bool = False, stub_path: Optional[str] = None) -> Dict[str, List[Dict[int, Dict[str, List[float]]]]]:
         """
         Gets object tracks from the given frames.
 
         Args:
-            frames (list): List of frames to track objects in.
+            frames (List[np.ndarray]): List of frames to track objects in.
             read_from_stub (bool, optional): Whether to read tracks from a stub file. Defaults to False.
-            stub_path (str, optional): Path to the stub file. Defaults to None.
+            stub_path (Optional[str], optional): Path to the stub file. Defaults to None.
 
         Returns:
-            dict: Dictionary containing tracks for players, referees, and the ball.
+            Dict[str, List[Dict[int, Dict[str, List[float]]]]]: Dictionary containing tracks for players, referees, and the ball.
         """
         if read_from_stub and stub_path and os.path.exists(stub_path):
             with open(stub_path, "rb") as f:
@@ -88,9 +87,7 @@ class Tracker:
                 if cls_names[class_id] == "goalkeeper":
                     detection_supervision.class_id[object_id] = cls_names_inv["player"]
 
-            detection_with_tracks = self.tracker.update_with_detections(
-                detection_supervision
-            )
+            detection_with_tracks = self.tracker.update_with_detections(detection_supervision)
 
             # Update tracks for players and referees
             for frame_detection in detection_with_tracks:
@@ -117,15 +114,15 @@ class Tracker:
 
         return tracks
 
-    def draw_ellipse(self, frame, bbox, color, track_id=None):
+    def draw_ellipse(self, frame: np.ndarray, bbox: List[float], color: tuple, track_id: Optional[int] = None) -> np.ndarray:
         """
         Draws an ellipse on the given frame.
 
         Args:
             frame (np.ndarray): The frame to draw on.
-            bbox (list): Bounding box coordinates.
+            bbox (List[float]): Bounding box coordinates.
             color (tuple): Color of the ellipse.
-            track_id (int, optional): ID of the track. Defaults to None.
+            track_id (Optional[int], optional): ID of the track. Defaults to None.
 
         Returns:
             np.ndarray: The frame with the ellipse drawn.
@@ -146,44 +143,57 @@ class Tracker:
         )
 
         if track_id is not None:
-            rectangle_width = 40
-            rectangle_height = 20
-            x1_rect = x_center - rectangle_width // 2
-            x2_rect = x_center + rectangle_width // 2
-            y1_rect = (y2 - rectangle_height // 2) + 15
-            y2_rect = (y2 + rectangle_height // 2) + 15
-
-            cv2.rectangle(
-                frame,
-                (int(x1_rect), int(y1_rect)),
-                (int(x2_rect), int(y2_rect)),
-                color,
-                cv2.FILLED,
-            )
-
-            x1_text = x1_rect + 12
-            if track_id > 99:
-                x1_text -= 10
-
-            cv2.putText(
-                frame,
-                f"{track_id}",
-                (int(x1_text), int(y1_rect + 15)),
-                cv2.FONT_HERSHEY_DUPLEX,
-                0.6,
-                (0, 0, 0),
-                2,
-            )
+            self._draw_track_id(frame, x_center, y2, track_id, color)
 
         return frame
 
-    def draw_triangle(self, frame, bbox, color):
+    def _draw_track_id(self, frame: np.ndarray, x_center: int, y2: int, track_id: int, color: tuple) -> None:
+        """
+        Draws the track ID on the given frame.
+
+        Args:
+            frame (np.ndarray): The frame to draw on.
+            x_center (int): The x-coordinate of the center of the bounding box.
+            y2 (int): The y-coordinate of the bottom of the bounding box.
+            track_id (int): ID of the track.
+            color (tuple): Color of the rectangle and text.
+        """
+        rectangle_width = 40
+        rectangle_height = 20
+        x1_rect = x_center - rectangle_width // 2
+        x2_rect = x_center + rectangle_width // 2
+        y1_rect = (y2 - rectangle_height // 2) + 15
+        y2_rect = (y2 + rectangle_height // 2) + 15
+
+        cv2.rectangle(
+            frame,
+            (int(x1_rect), int(y1_rect)),
+            (int(x2_rect), int(y2_rect)),
+            color,
+            cv2.FILLED,
+        )
+
+        x1_text = x1_rect + 12
+        if track_id > 99:
+            x1_text -= 10
+
+        cv2.putText(
+            frame,
+            f"{track_id}",
+            (int(x1_text), int(y1_rect + 15)),
+            cv2.FONT_HERSHEY_DUPLEX,
+            0.6,
+            (0, 0, 0),
+            2,
+        )
+
+    def draw_triangle(self, frame: np.ndarray, bbox: List[float], color: tuple) -> np.ndarray:
         """
         Draws a triangle on the given frame.
 
         Args:
             frame (np.ndarray): The frame to draw on.
-            bbox (list): Bounding box coordinates.
+            bbox (List[float]): Bounding box coordinates.
             color (tuple): Color of the triangle.
 
         Returns:
@@ -199,16 +209,52 @@ class Tracker:
 
         return frame
 
-    def draw_annotations(self, frames, tracks):
+    def draw_team_ball_control(self, frame: np.ndarray, frame_num: int, team_ball_control: np.ndarray) -> np.ndarray:
+        """
+        Draws the team ball control statistics on the given frame.
+
+        Args:
+            frame (np.ndarray): The frame to draw on.
+            frame_num (int): The current frame number.
+            team_ball_control (np.ndarray): Array containing team ball control data.
+
+        Returns:
+            np.ndarray: The frame with the team ball control statistics drawn.
+        """
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (1350, 850), (1900, 970), (255, 255, 255), cv2.FILLED)
+        alpha = 0.4
+        cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
+        team_ball_control_till_frame = team_ball_control[:frame_num + 1]
+
+        team_1_num_frames = np.sum(team_ball_control_till_frame == 1)
+        team_2_num_frames = np.sum(team_ball_control_till_frame == 2)
+        total_frames = team_1_num_frames + team_2_num_frames
+
+        if total_frames > 0:
+            team_1_control = team_1_num_frames / total_frames
+            team_2_control = team_2_num_frames / total_frames
+        else:
+            team_1_control = team_2_control = 0.0
+
+        cv2.putText(frame, f"Team 1 Ball Control: {team_1_control * 100:.2f}%",
+                    (1400, 900), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+        cv2.putText(frame, f"Team 2 Ball Control: {team_2_control * 100:.2f}%",
+                    (1400, 950), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+
+        return frame
+
+    def draw_annotations(self, frames: List[np.ndarray], tracks: Dict[str, List[Dict[int, Dict[str, List[float]]]]], team_ball_control: np.ndarray) -> List[np.ndarray]:
         """
         Draws annotations on the given frames.
 
         Args:
-            frames (list): List of frames to draw annotations on.
-            tracks (dict): Dictionary containing tracks for players, referees, and the ball.
+            frames (List[np.ndarray]): List of frames to draw annotations on.
+            tracks (Dict[str, List[Dict[int, Dict[str, List[float]]]]]): Dictionary containing tracks for players, referees, and the ball.
+            team_ball_control (np.ndarray): Array containing team ball control data.
 
         Returns:
-            list: List of frames with annotations drawn.
+            List[np.ndarray]: List of frames with annotations drawn.
         """
         output_frames = []
         for frame_num, frame in enumerate(frames):
@@ -228,5 +274,7 @@ class Tracker:
 
             for _, ball in ball_dict.items():
                 frame = self.draw_triangle(frame, ball["bbox"], (0, 255, 0))
+
+            frame = self.draw_team_ball_control(frame, frame_num, team_ball_control)
             output_frames.append(frame)
         return output_frames
