@@ -1,3 +1,6 @@
 .env
 training/.env
 training/football-players-detection-1/**
+__pycache__
+.vscode
+.DS_Store
